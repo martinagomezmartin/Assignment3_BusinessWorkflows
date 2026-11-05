@@ -1,13 +1,6 @@
-# PDF processing and Markdown conversion
-PyMuPDF
-pymupdf4llm
-llama-index
-
-# OCR support
-rapidocr
-onnxruntime
-
-
-# LLM support
-json
-openai
+PyMuPDF==2.1
+pymupdf4llm==2.1
+llama-index==0.14.25
+rapidocr=3.10.0
+onnxruntime==1.31.1
+openai==2.54.0
