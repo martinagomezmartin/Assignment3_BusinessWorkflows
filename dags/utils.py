@@ -6,6 +6,7 @@ import json
 from openai import OpenAI
 
 
+
 def pdf_to_markdown(pdf_path: str) -> str:
     """
     Convert a PDF file to Markdown format.
@@ -18,13 +19,10 @@ def pdf_to_markdown(pdf_path: str) -> str:
     doc = pymupdf.open(pdf_path)
 
     try:
-        #print(f"PDF opened successfully. Pages: {len(doc)}")
 
 
-        #print("Converting PDF to Markdown...")
+        #Converting PDF to Markdown
         md_text = pymupdf4llm.to_markdown(doc)
-
-        #print(f"Conversion completed! Characters: {len(md_text)}")
 
         return md_text
 
@@ -60,26 +58,62 @@ def summarize_paper(markdown_content: str) -> dict:
 
     # 2. Define the system message
     system_prompt = """
-    You are an academic research assistant specialized
-    in analyzing and summarizing scientific research papers.
+    You are an academic research assistant specialized in analyzing and summarizing scientific research papers in the field of **Computer Science**.
 
-    Analyze the provided research paper and extract:
+    Analyze the 
+    provided research paper and extract the following information:
 
-    1. title: The title of the research paper.
-    2. summary: A concise but informative summary explaining
-       the research objective, methodology, main findings
-       and conclusions.
-    3. keywords: A list of 5 to 10 relevant keywords.
-    4. category: The main research category or field.
+    1. **title**: The title of the research paper.
+    2. **summary**: A concise but informative summary explaining the research objective, methodology, main findings, and conclusions.
+    3. **keywords**: A list of 5 to 10 relevant keywords describing the paper's main topics, techniques, and concepts.
+    4. **category**: The single main research category that best describes the paper.
 
-    Instructions:
+    ### Research Categories
+
+    You MUST classify every paper into exactly ONE of the following predefined categories:
+
+    - `artificial_intelligence`: Artificial intelligence, machine learning, deep learning, neural networks, reinforcement learning, natural language processing, computer vision, and related AI techniques.
+    - `software_engineering`: Software development, software testing, programming languages, software architecture, software maintenance, developer tools, and software design.
+    - `computer_systems`: Operating systems, distributed systems, cloud computing, computer architecture, computer networks, databases, and infrastructure.
+    - `data_management`: Data mining, information retrieval, big data, data processing, knowledge representation, and data management technologies.
+    - `cybersecurity`: Information security, cryptography, privacy, authentication, vulnerability analysis, and secure computing.
+    - `human_computer_interaction`: Human-computer interaction, user interfaces, usability, accessibility, interaction design, and user experience.
+    - `theoretical_computer_science`: Algorithms, computational complexity, formal methods, logic, graph theory, and theoretical foundations of computing.
+
+    ### Classification Rules
+
+    - Assign exactly ONE category to each paper.
+    - Select the category that best represents the paper's primary research contribution, not simply a secondary topic or technique it uses.
+    - Consider the research objective, methodology, and main contributions when deciding on the category.
+    - If a paper spans multiple categories, choose the one most central to its contribution.
+    - Do not create new categories, rename categories, or return multiple categories.
+    - Always use one of the exact category identifiers listed above.
+
+    ### General Instructions
+
     - Only use information explicitly supported by the paper.
-    - Do not invent information.
-    - Be concise and precise.
+    - Do not invent information or make unsupported assumptions.
+    - Be concise, precise, and objective.
+    - Ensure keywords are relevant and avoid unnecessary duplication.
     - Return ONLY valid JSON.
     - Do not include Markdown formatting or code blocks.
-    """
 
+    ### Expected JSON Output
+
+    {
+    "title": "Paper title",
+    "summary": "Concise summary of the paper...",
+    "keywords": [
+        "keyword 1",
+        "keyword 2",
+        "keyword 3",
+        "keyword 4",
+        "keyword 5"
+    ],
+    "category": "artificial_intelligence"
+    }
+    """ 
+    
     # 3. Create the user message
     user_prompt = f"""
     Analyze the following research paper and return
@@ -91,10 +125,13 @@ def summarize_paper(markdown_content: str) -> dict:
 
     {markdown_content}
     """
-
+    client = OpenAI(
+    api_key="your-api-key",
+    base_url="http://localhost:1234/v1"
+    )
     # 4. Call the LLM
     completion = client.chat.completions.create(
-        model=os.getenv("MODEL", "gemma-4-e2b-it-qat"),
+        model="gemma-4-e2b-it-qat",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
