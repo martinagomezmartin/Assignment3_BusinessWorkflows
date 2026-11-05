@@ -26,6 +26,7 @@ if not DRIVE_DIRECTORY:
 DRIVE_DIRECTORY = Path(DRIVE_DIRECTORY).resolve()
 
 LLM_MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "gemma-4-e2b-it-qat")
+LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://localhost:1234/v1")
 
 def discover_new_papers_in_drive_sync_dir():
   """Find files that are not yet in the SQLite database."""
@@ -62,7 +63,7 @@ def process_new_paper(filename):
 
   # Call function to extract metadata with local LLM
   print(f"Calling function to extract metadata with local LLM on file (mkdwn converted): {filename}")
-  metadata_object = summarize_paper(LLM_MODEL_NAME, markdown_contents)
+  metadata_object = summarize_paper(LLM_MODEL_NAME, LLM_API_BASE_URL, markdown_contents)
 
   # Store processed file in DB
   conn = sqlite3.connect(DB_PATH)

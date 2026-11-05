@@ -25,7 +25,7 @@ def pdf_to_markdown(pdf_path: str) -> str:
     finally:
         doc.close()
 
-def summarize_paper(model_name: str, markdown_content: str) -> dict:
+def summarize_paper(model_name: str, api_base_url: str, markdown_content: str) -> dict:
     """
     Summarize a research paper using an LLM and return
     the result as a structured JSON object.
@@ -120,7 +120,7 @@ def summarize_paper(model_name: str, markdown_content: str) -> dict:
     """
     client = OpenAI(
     api_key="your-api-key",
-    base_url="http://localhost:1234/v1"
+    base_url=api_base_url
     )
 
     # Call the LLM
