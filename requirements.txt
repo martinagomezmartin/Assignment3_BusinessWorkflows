@@ -1,0 +1,13 @@
+# PDF processing and Markdown conversion
+PyMuPDF
+pymupdf4llm
+llama-index
+
+# OCR support
+rapidocr
+onnxruntime
+
+
+# LLM support
+json
+openai
