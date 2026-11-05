@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Library</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1f2328; --muted: #656d76;
+    --border: #d0d7de; --border-strong: #afb8c1; --accent: #0969da;
+    --accent-soft: rgba(9, 105, 218, .12); --chip: #eef1f4;
+    --control-h: 40px; --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --card: #161b22; --text: #e6edf3; --muted: #8d96a0;
+      --border: #30363d; --border-strong: #484f58; --accent: #4493f8;
+      --accent-soft: rgba(68, 147, 248, .18); --chip: #21262d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { margin: 0 0 4px; font-size: 28px; line-height: 1.2; }
+  .subtitle { margin: 0 0 12px; color: var(--muted); }
+
+  /* ---- Toolbar ---- */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    position: sticky; top: 0; z-index: 1;
+    padding: 12px 0; background: var(--bg); border-bottom: 1px solid transparent;
+  }
+  .controls.stuck { border-bottom-color: var(--border); }
+  .field { position: relative; display: flex; align-items: center; }
+  .field-search { flex: 1 1 320px; }
+  .field-select { flex: 0 0 230px; }
+  .field svg {
+    position: absolute; pointer-events: none; color: var(--muted); width: 16px; height: 16px;
+  }
+  .field-search svg { left: 12px; }
+  .field-select svg { right: 12px; }
+  .controls input, .controls select, .controls button {
+    -webkit-appearance: none; appearance: none; margin: 0;
+    height: var(--control-h); font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .controls input { width: 100%; padding: 0 12px 0 36px; }
+  .controls input::placeholder { color: var(--muted); }
+  .controls input::-webkit-search-cancel-button { cursor: pointer; }
+  .controls select { width: 100%; padding: 0 38px 0 12px; cursor: pointer; text-overflow: ellipsis; }
+  .controls button { padding: 0 16px; cursor: pointer; font-weight: 500; }
+  .controls input:hover, .controls select:hover, .controls button:hover { border-color: var(--border-strong); }
+  .controls input:focus-visible, .controls select:focus-visible, .controls button:focus-visible,
+  .keyword:focus-visible {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .count {
+    margin-left: auto; min-width: 9ch; text-align: right; white-space: nowrap;
+    color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Paper cards ---- */
+  .paper {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; margin-top: 14px;
+  }
+  .paper[hidden] { display: none; }
+  .paper h2 { margin: 0 0 10px; font-size: 18px; line-height: 1.35; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 10px; }
+  .category {
+    font-size: 12px; font-weight: 600; line-height: 20px; padding: 0 10px; border-radius: 999px;
+    color: var(--accent); background: var(--accent-soft);
+  }
+  .file {
+    display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+    font-size: 13px; color: var(--muted);
+  }
+  .file svg { flex: none; width: 14px; height: 14px; }
+  .file a { color: inherit; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .file a:hover { color: var(--accent); }
+  .summary { margin: 0 0 14px; }
+  .keywords { display: flex; flex-wrap: wrap; gap: 6px; }
+  .keyword {
+    font: inherit; font-size: 12px; line-height: 22px; padding: 0 9px; cursor: pointer;
+    color: var(--text); background: var(--chip); border: 1px solid var(--border); border-radius: 6px;
+  }
+  .keyword:hover { border-color: var(--accent); color: var(--accent); }
+  .empty { color: var(--muted); text-align: center; margin-top: 48px; }
+
+  @media (max-width: 640px) {
+    main { padding-top: 24px; }
+    .field-search { flex-basis: 100%; }
+    .field-select { flex: 1 1 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Research Library</h1>
+  <p class="subtitle">{{ papers|length }} paper{{ "" if papers|length == 1 else "s" }}, summarized by a local LLM.</p>
+
+  <div class="controls" id="controls">
+    <div class="field field-search">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.75"/><path d="m10.5 10.5 3.25 3.25"/></svg>
+      <input id="search" type="search" placeholder="Search title, summary, keywords…" aria-label="Search papers" autocomplete="off">
+    </div>
+    <div class="field field-select">
+      <select id="category" aria-label="Filter by category">
+        <option value="">All categories</option>
+        {% for value, label in categories %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+    </div>
+    <button id="reset" type="button">Reset</button>
+    <span class="count" id="count" aria-live="polite">{{ papers|length }} / {{ papers|length }} papers</span>
+  </div>
+
+  {% for paper in papers %}
+  <article class="paper" data-category="{{ paper.category }}" data-search="{{ paper.search_text }}">
+    <h2>{{ paper.title }}</h2>
+    <div class="meta">
+      <span class="category">{{ paper.category_label }}</span>
+      <span class="file"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.75h5.25L12.5 5v9.25h-8.5z"/><path d="M9 1.75V5.25h3.5"/></svg><a href="../papers/{{ paper.filename|urlencode }}">{{ paper.filename }}</a></span>
+    </div>
+    <p class="summary">{{ paper.summary }}</p>
+    {% if paper.keywords %}
+    <div class="keywords">
+      {% for keyword in paper.keywords %}
+      <button class="keyword" type="button" title="Search for this keyword">{{ keyword }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+
+  <p class="empty" id="empty"{% if papers %} hidden{% endif %}>
+    {% if papers %}No papers match your search.{% else %}The library is empty. Add PDFs to the papers/ folder.{% endif %}
+  </p>
+</main>
+
+<script>
+  (function () {
+    const search = document.getElementById("search");
+    const category = document.getElementById("category");
+    const count = document.getElementById("count");
+    const empty = document.getElementById("empty");
+    const papers = Array.from(document.querySelectorAll(".paper"));
+
+    function applyFilters() {
+      const terms = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+      const selected = category.value;
+      let visible = 0;
+      for (const paper of papers) {
+        const matches =
+          (!selected || paper.dataset.category === selected) &&
+          terms.every((term) => paper.dataset.search.includes(term));
+        paper.hidden = !matches;
+        if (matches) visible++;
+      }
+      count.textContent = visible + " / " + papers.length + " papers";
+      if (papers.length) empty.hidden = visible > 0;
+    }
+
+    const controls = document.getElementById("controls");
+    const toolbarTop = controls.offsetTop;
+    window.addEventListener("scroll", function () {
+      controls.classList.toggle("stuck", window.scrollY > toolbarTop);
+    }, { passive: true });
+
+    search.addEventListener("input", applyFilters);
+    category.addEventListener("change", applyFilters);
+    document.getElementById("reset").addEventListener("click", function () {
+      search.value = "";
+      category.value = "";
+      applyFilters();
+    });
+    for (const chip of document.querySelectorAll(".keyword")) {
+      chip.addEventListener("click", function () {
+        search.value = chip.textContent.trim();
+        applyFilters();
+        search.focus();
+      });
+    }
+  })();
+</script>
+</body>
+</html>

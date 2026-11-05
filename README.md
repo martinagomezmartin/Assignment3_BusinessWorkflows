@@ -28,6 +28,11 @@ python -m pip check
 Set `DRIVE_SYNC_DIR_PATH` in `.env` to an existing directory containing your
 papers. Relative paths are interpreted relative to the project root.
 
+Set `DISCORD_WEBHOOK_URL` in `.env` to receive a notification for every newly
+processed paper (in Discord: *Server Settings → Integrations → Webhooks → New
+Webhook → Copy Webhook URL*). If it is not set, the report task only logs a
+warning and the papers stay unreported until a webhook is configured.
+
 ```bash
 bash run_airflow.sh
 ```
@@ -54,3 +59,15 @@ Open `research_library_dag`, unpause it, and select **Trigger DAG**. The DAG
 discovers new filenames, maps one processing task per file, and marks reported
 papers in SQLite. Subsequent runs skip already processed files. The report task
 also runs when there are no new files.
+
+## Outputs
+
+- **Static library page:** `<DRIVE_SYNC_DIR_PATH>/output/index.html` is regenerated
+  on every run with all papers in the database (so Google Drive syncs it). It is a
+  single self-contained file: search box (title, summary, keywords, filename),
+  category filter, clickable keyword chips, and links to the PDFs in `../papers/`.
+  The template is in `dags/templates/library.html.j2`.
+- **Discord notification:** one message listing the newly processed papers, one
+  card per paper (title, summary preview, category, keywords, filename). Papers are
+  marked `reported` in SQLite only after Discord accepted the message, so a failed
+  notification is retried on the next run.

@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 import os
 
 from utils import pdf_to_markdown, summarize_paper
+from library_html import write_library_html
+from discord_notifier import send_discord_notification
 
 # Directory containing this Python file
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,6 +29,21 @@ DRIVE_DIRECTORY = Path(DRIVE_DIRECTORY).resolve()
 
 LLM_MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "gemma-4-e2b-it-qat")
 LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://localhost:1234/v1")
+
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+
+def rows_to_papers(rows):
+  """Convert (filename, title, summary, keywords, category) DB rows into dicts."""
+  return [
+    {
+      "filename": filename,
+      "title": title,
+      "summary": summary,
+      "keywords": json.loads(keywords),
+      "category": category,
+    }
+    for filename, title, summary, keywords, category in rows
+  ]
 
 def discover_new_papers_in_drive_sync_dir():
   """Find files that are not yet in the SQLite database."""
@@ -114,21 +131,14 @@ def research_library_dag():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    all_papers = cur.execute("SELECT filename, title, summary, keywords, category FROM paper")
-
-    # TODO: Build static html library... (replace the following placeholder, apply some sorting/filtering options).
-    print(f"Building static html library for all entries: {[p[0] for p in all_papers]}")
-    output_html_content = """<body>
-    <h1>Here should go the library for all the papers:</h1>
-    <ul>
-    """ + '\n'.join(['<li>' + p[0] + '</li>' for p in all_papers]) + """
-    </ul>
-    </body>"""
-
-    with open(f"{directory}/index.html", "w") as output_file:
-      output_file.write(output_html_content)
-
+    all_papers = rows_to_papers(
+      cur.execute("SELECT filename, title, summary, keywords, category FROM paper").fetchall()
+    )
     conn.close()
+
+    print(f"Building static html library for all entries: {[p['filename'] for p in all_papers]}")
+    output_path = write_library_html(all_papers, directory)
+    print(f"Library with {len(all_papers)} papers written to {output_path}")
 
   @task(trigger_rule="none_failed")
   def send_discord_report():
@@ -138,19 +148,36 @@ def research_library_dag():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    unreported = cur.execute("SELECT filename, title, summary, keywords, category FROM paper WHERE NOT reported")
-    unreported_filenames = [e[0] for e in unreported]
-
-    # TODO: Send new processed file list through Discord message...
-    print(f"Reporting on {unreported_filenames} through Discord...")
-
-    cur.executemany(
-        "UPDATE paper SET reported = true WHERE filename = ?",
-        [(filename,) for filename in unreported_filenames],
+    unreported = rows_to_papers(
+      cur.execute("SELECT filename, title, summary, keywords, category FROM paper WHERE NOT reported").fetchall()
     )
-  
-    conn.commit()
-    conn.close()
+
+    if not unreported:
+      print("No new papers to report.")
+      conn.close()
+      return
+
+    unreported_filenames = [p["filename"] for p in unreported]
+
+    if not DISCORD_WEBHOOK_URL:
+      # Leave the papers unreported so they are sent once a webhook is configured
+      print(f"WARNING: DISCORD_WEBHOOK_URL is not set, skipping Discord report for {unreported_filenames}")
+      conn.close()
+      return
+
+    print(f"Reporting on {unreported_filenames} through Discord...")
+    try:
+      # Raises if Discord rejects the request, so papers are only marked as reported once sent
+      messages_sent = send_discord_notification(DISCORD_WEBHOOK_URL, unreported)
+      print(f"Sent {messages_sent} Discord message(s).")
+
+      cur.executemany(
+          "UPDATE paper SET reported = true WHERE filename = ?",
+          [(filename,) for filename in unreported_filenames],
+      )
+      conn.commit()
+    finally:
+      conn.close()
 
   scan_task >> process_tasks
   process_tasks >> output_static_html_report()

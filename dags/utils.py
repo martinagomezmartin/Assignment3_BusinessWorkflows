@@ -123,25 +123,72 @@ def summarize_paper(model_name: str, api_base_url: str, markdown_content: str) -
     base_url=api_base_url
     )
 
-    # Call the LLM
-    completion = client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.2
-    )
+    # Call the LLM, parse and validate its JSON answer. If that fails, retry once.
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        completion = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.2
+        )
 
-    # Extract the response
-    response = completion.choices[0].message.content
+        # Extract the response
+        response = completion.choices[0].message.content
 
-    # Convert the response into a Python dictionary
+        try:
+            return validate_metadata(parse_llm_json(response))
+        except ValueError as e:
+            print(f"Attempt {attempt}/{max_attempts}: invalid LLM output ({e})")
+            last_error = e
+
+    raise ValueError(
+        f"The LLM did not return valid metadata JSON after {max_attempts} attempts: {response}"
+    ) from last_error
+
+
+def parse_llm_json(response: str) -> dict:
+    """
+    Parse the LLM response with json.loads(), tolerating a surrounding ```json code fence.
+    Raises ValueError if the response is not a JSON object.
+    """
+    if not isinstance(response, str):
+        raise ValueError("empty response")
+
+    text = response.strip()
+    if text.startswith("```"):
+        # Drop the opening fence line (``` or ```json) and the closing fence
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        text = text.rsplit("```", 1)[0]
+
     try:
-        summary = json.loads(response)
-    except (json.JSONDecodeError, TypeError) as e:
-        raise ValueError(
-            f"The LLM did not return valid JSON: {response}"
-        ) from e
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"not valid JSON: {e}") from e
 
-    return summary
+    if not isinstance(data, dict):
+        raise ValueError("JSON is not an object")
+    return data
+
+
+def validate_metadata(data: dict) -> dict:
+    """
+    Check that the required fields exist and have the expected basic types.
+    Raises ValueError otherwise.
+    """
+    for field in ("title", "summary", "category"):
+        if not isinstance(data.get(field), str) or not data[field].strip():
+            raise ValueError(f"'{field}' must be a non-empty string")
+
+    keywords = data.get("keywords")
+    if not isinstance(keywords, list) or not all(isinstance(k, str) for k in keywords):
+        raise ValueError("'keywords' must be a list of strings")
+
+    return {
+        "title": data["title"].strip(),
+        "summary": data["summary"].strip(),
+        "keywords": [k.strip() for k in keywords if k.strip()],
+        "category": data["category"].strip(),
+    }
