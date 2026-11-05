@@ -5,8 +5,6 @@ import os
 import json
 from openai import OpenAI
 
-
-
 def pdf_to_markdown(pdf_path: str) -> str:
     """
     Convert a PDF file to Markdown format.
@@ -19,8 +17,6 @@ def pdf_to_markdown(pdf_path: str) -> str:
     doc = pymupdf.open(pdf_path)
 
     try:
-
-
         #Converting PDF to Markdown
         md_text = pymupdf4llm.to_markdown(doc)
 
@@ -29,10 +25,7 @@ def pdf_to_markdown(pdf_path: str) -> str:
     finally:
         doc.close()
 
-
-
-
-def summarize_paper(markdown_content: str) -> dict:
+def summarize_paper(model_name: str, markdown_content: str) -> dict:
     """
     Summarize a research paper using an LLM and return
     the result as a structured JSON object.
@@ -44,7 +37,7 @@ def summarize_paper(markdown_content: str) -> dict:
         dict: Structured research paper summary.
     """
 
-    # 1. Define the expected JSON structure
+    # Define the expected JSON structure
     output_structure = {
         "title": "Paper title",
         "summary": "A concise summary of the research paper",
@@ -56,7 +49,7 @@ def summarize_paper(markdown_content: str) -> dict:
         "category": "Research paper category"
     }
 
-    # 2. Define the system message
+    # Define the system message
     system_prompt = """
     You are an academic research assistant specialized in analyzing and summarizing scientific research papers in the field of **Computer Science**.
 
@@ -114,7 +107,7 @@ def summarize_paper(markdown_content: str) -> dict:
     }
     """ 
     
-    # 3. Create the user message
+    # Create the user message
     user_prompt = f"""
     Analyze the following research paper and return
     the results using this JSON structure:
@@ -129,9 +122,10 @@ def summarize_paper(markdown_content: str) -> dict:
     api_key="your-api-key",
     base_url="http://localhost:1234/v1"
     )
-    # 4. Call the LLM
+
+    # Call the LLM
     completion = client.chat.completions.create(
-        model="gemma-4-e2b-it-qat",
+        model=model_name,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -139,10 +133,10 @@ def summarize_paper(markdown_content: str) -> dict:
         temperature=0.2
     )
 
-    # 5. Extract the response
+    # Extract the response
     response = completion.choices[0].message.content
 
-    # 6. Convert the response into a Python dictionary
+    # Convert the response into a Python dictionary
     try:
         summary = json.loads(response)
     except (json.JSONDecodeError, TypeError) as e:
