@@ -11,7 +11,16 @@ def main():
 
   res = cur.execute("SELECT * FROM paper;")
   entries = res.fetchall()
-  print(f"Entires: {entries}")
+
+  print()
+  header = ['Filename', 'Title', 'Summary', 'Keywords', 'Category']
+  rows = [header] + [5*[15*'-']] + [[f, t, s, k.count('", "'), c] for (f, t, s, k, c, _) in entries]
+  print('|\n'.join([''.join(['| {:16}'.format(
+    str(x) if type(x) == int else
+    x if len(x) < 16 
+    else x[:13] + '...'
+  ) for x in r]) for r in rows]) + '|')
+  print()
   con.close()
 
 if __name__ == '__main__':
